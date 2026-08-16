@@ -118,6 +118,7 @@ fun MainScreen(viewModel: MusicViewModel) {
     val homePlaylists by viewModel.homePlaylists.collectAsState()
     val currentSong by viewModel.currentSong.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
+    val isLooping by viewModel.isLooping.collectAsState()
     val playbackProgress by viewModel.playbackProgress.collectAsState()
 
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
@@ -285,11 +286,13 @@ fun MainScreen(viewModel: MusicViewModel) {
                 PlayerScreen(
                     song = currentSong!!,
                     isPlaying = isPlaying,
+                    isLooping = isLooping,
                     progress = playbackProgress,
                     onProgressChange = { viewModel.updateProgress(it) },
                     onPlayPause = { viewModel.togglePlayPause() },
                     onNext = { viewModel.skipNext() },
                     onPrevious = { viewModel.skipPrevious() },
+                    onLoopToggle = { viewModel.toggleLoop() },
                     onFavoriteToggle = { viewModel.toggleFavorite(currentSong!!.id) },
                     onClose = { isPlayerExpanded = false },
                     onDelete = { viewModel.deleteSong(currentSong!!.id) },

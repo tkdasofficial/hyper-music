@@ -1,7 +1,10 @@
 package com.hyper.music.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import android.media.MediaPlayer
+import android.net.Uri
 import com.hyper.music.R
 import com.hyper.music.model.Playlist
 import com.hyper.music.model.Song
@@ -17,9 +20,16 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.isActive
 import java.util.UUID
 
-class MusicViewModel : ViewModel() {
+class MusicViewModel(application: Application) : AndroidViewModel(application) {
+
+    private var mediaPlayer: MediaPlayer? = null
+    private var progressJob: Job? = null
+
+    private val _isLooping = MutableStateFlow(false)
+    val isLooping: StateFlow<Boolean> = _isLooping.asStateFlow()
 
     private val _themeMode = MutableStateFlow(ThemeMode.System)
     val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
@@ -57,7 +67,7 @@ class MusicViewModel : ViewModel() {
         val favorites = Playlist("auto_fav", "Favorites", favoriteSongs, favoriteImage, true)
         
         val artistAutoPlaylists = songs.groupBy { it.artist }
-            .filter { it.value.size >= 5 }
+            .filter { it.value.size >= 1 }
             .map { Playlist("auto_artist_${it.key}", "${it.key} Essentials", it.value, it.value.first().imageRes, true) }
             
         listOf(mostPlayed, favorites) + custom + artistAutoPlaylists
@@ -159,8 +169,30 @@ class MusicViewModel : ViewModel() {
         }
     }
 
+    private fun startProgressLoop() {
+        progressJob?.cancel()
+        progressJob = viewModelScope.launch {
+            while (isActive) {
+                mediaPlayer?.let { player ->
+                    if (player.isPlaying) {
+                        val pos = player.currentPosition.toFloat()
+                        val dur = player.duration.toFloat()
+                        if (dur > 0) {
+                            _playbackProgress.value = pos / dur
+                        }
+                    }
+                }
+                delay(500)
+            }
+        }
+    }
+
     fun togglePlayPause() {
-        _isPlaying.value = !_isPlaying.value
+        val playing = !_isPlaying.value
+        _isPlaying.value = playing
+        mediaPlayer?.let {
+            if (playing) it.start() else it.pause()
+        }
     }
 
     fun playSong(song: Song) {
@@ -168,9 +200,30 @@ class MusicViewModel : ViewModel() {
         _isPlaying.value = true
         _playbackProgress.value = 0f
         
+        mediaPlayer?.release()
+        try {
+            if (song.dataUri != null) {
+                mediaPlayer = MediaPlayer.create(getApplication(), Uri.parse(song.dataUri))?.apply {
+                    isLooping = _isLooping.value
+                    setOnCompletionListener {
+                        if (!isLooping) skipNext()
+                    }
+                    start()
+                }
+                startProgressLoop()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
         _allSongs.update { songs ->
             songs.map { if (it.id == song.id) it.copy(playCount = it.playCount + 1) else it }
         }
+    }
+
+    fun toggleLoop() {
+        _isLooping.value = !_isLooping.value
+        mediaPlayer?.isLooping = _isLooping.value
     }
 
     fun toggleFavorite(songId: String) {
@@ -228,5 +281,15 @@ class MusicViewModel : ViewModel() {
 
     fun updateProgress(progress: Float) {
         _playbackProgress.value = progress
+        mediaPlayer?.let {
+            it.seekTo((it.duration * progress).toInt())
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        mediaPlayer?.release()
+        mediaPlayer = null
+        progressJob?.cancel()
     }
 }

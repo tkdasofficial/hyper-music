@@ -24,16 +24,22 @@ import coil.compose.AsyncImage
 import com.hyper.music.model.Song
 import com.hyper.music.R
 
+import android.content.Intent
+import android.provider.Settings
+import androidx.compose.ui.platform.LocalContext
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerScreen(
     song: Song,
     isPlaying: Boolean,
+    isLooping: Boolean,
     progress: Float,
     onProgressChange: (Float) -> Unit,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
+    onLoopToggle: () -> Unit,
     onFavoriteToggle: () -> Unit,
     onClose: () -> Unit,
     onDelete: () -> Unit,
@@ -41,6 +47,7 @@ fun PlayerScreen(
     onShare: () -> Unit,
     onSetRingtone: () -> Unit
 ) {
+    val context = LocalContext.current
     var swipeOffset by remember { mutableStateOf(0f) }
 
     Surface(
@@ -242,8 +249,12 @@ fun PlayerScreen(
                 ) {
                     Icon(Icons.Default.SkipNext, contentDescription = "Next", modifier = Modifier.size(40.dp))
                 }
-                IconButton(onClick = { /* Repeat */ }) {
-                    Icon(Icons.Default.Repeat, contentDescription = "Repeat")
+                IconButton(onClick = onLoopToggle) {
+                    Icon(
+                        Icons.Default.Repeat, 
+                        contentDescription = "Repeat",
+                        tint = if (isLooping) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
+                    )
                 }
             }
 
@@ -255,7 +266,10 @@ fun PlayerScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { /* Devices/Bluetooth */ }) {
+                IconButton(onClick = { 
+                    val intent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS)
+                    context.startActivity(intent)
+                }) {
                     Icon(
                         imageVector = Icons.Default.Bluetooth,
                         contentDescription = "Bluetooth",
