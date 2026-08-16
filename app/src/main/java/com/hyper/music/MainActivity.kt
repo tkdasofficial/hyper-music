@@ -1,6 +1,14 @@
 package com.hyper.music
 
 import android.os.Bundle
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import androidx.compose.ui.platform.LocalContext
+import coil.compose.AsyncImage
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -75,6 +83,32 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(viewModel: MusicViewModel) {
+    val context = LocalContext.current
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val granted = permissions.entries.all { it.value }
+        if (granted) {
+            viewModel.loadLocalAudio(context)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        val reqPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            arrayOf(Manifest.permission.READ_MEDIA_AUDIO, Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+        }
+        val allGranted = reqPermissions.all {
+            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+        }
+        if (allGranted) {
+            viewModel.loadLocalAudio(context)
+        } else {
+            permissionLauncher.launch(reqPermissions)
+        }
+    }
+
     var isPlayerExpanded by remember { mutableStateOf(false) }
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
     var isSearchExpanded by remember { mutableStateOf(false) }
@@ -443,14 +477,29 @@ fun SongsListSection(
                             .clickable { onSongClick(song) }
                             .padding(vertical = 6.dp)
                     ) {
-                        Image(
-                            painter = painterResource(id = song.imageRes),
-                            contentDescription = "Album Art",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                        )
+                        if (song.imageUri != null) {
+                            AsyncImage(
+                                model = song.imageUri,
+                                contentDescription = "Album Art",
+                                contentScale = ContentScale.Crop,
+                                error = painterResource(id = R.drawable.app_icon_hyper_music_1786889116311),
+                                fallback = painterResource(id = R.drawable.app_icon_hyper_music_1786889116311),
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                            )
+                        } else if (song.imageRes != null) {
+                            Image(
+                                painter = painterResource(id = song.imageRes),
+                                contentDescription = "Album Art",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                            )
+                        } else {
+                            Box(modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant))
+                        }
                         Spacer(modifier = Modifier.width(16.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
@@ -515,14 +564,29 @@ fun BottomPlayer(
                 contentAlignment = Alignment.Center
             ) {
                 // The Album Art
-                Image(
-                    painter = painterResource(id = song.imageRes),
-                    contentDescription = "Current Song",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(54.dp)
-                        .clip(CircleShape)
-                )
+                if (song.imageUri != null) {
+                    AsyncImage(
+                        model = song.imageUri,
+                        contentDescription = "Current Song",
+                        contentScale = ContentScale.Crop,
+                        error = painterResource(id = R.drawable.app_icon_hyper_music_1786889116311),
+                        fallback = painterResource(id = R.drawable.app_icon_hyper_music_1786889116311),
+                        modifier = Modifier
+                            .size(54.dp)
+                            .clip(CircleShape)
+                    )
+                } else if (song.imageRes != null) {
+                    Image(
+                        painter = painterResource(id = song.imageRes),
+                        contentDescription = "Current Song",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(54.dp)
+                            .clip(CircleShape)
+                    )
+                } else {
+                    Box(modifier = Modifier.size(54.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant))
+                }
                 
                 // The circular progress ring
                 val progressColor = MaterialTheme.colorScheme.primary

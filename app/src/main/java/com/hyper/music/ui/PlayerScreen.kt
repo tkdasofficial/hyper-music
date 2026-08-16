@@ -2,6 +2,7 @@ package com.hyper.music.ui
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -19,7 +20,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.hyper.music.model.Song
+import com.hyper.music.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -104,16 +107,40 @@ fun PlayerScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             // Album Art
-            Image(
-                painter = painterResource(id = song.imageRes),
-                contentDescription = "Album Art",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .clip(RoundedCornerShape(32.dp))
-                    .align(Alignment.CenterHorizontally)
-            )
+            if (song.imageUri != null) {
+                AsyncImage(
+                    model = song.imageUri,
+                    contentDescription = "Album Art",
+                    contentScale = ContentScale.Crop,
+                    error = painterResource(id = R.drawable.app_icon_hyper_music_1786889116311),
+                    fallback = painterResource(id = R.drawable.app_icon_hyper_music_1786889116311),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(32.dp))
+                        .align(Alignment.CenterHorizontally)
+                )
+            } else if (song.imageRes != null) {
+                Image(
+                    painter = painterResource(id = song.imageRes),
+                    contentDescription = "Album Art",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(32.dp))
+                        .align(Alignment.CenterHorizontally)
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(32.dp))
+                        .align(Alignment.CenterHorizontally)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                )
+            }
 
             Spacer(modifier = Modifier.height(48.dp))
 

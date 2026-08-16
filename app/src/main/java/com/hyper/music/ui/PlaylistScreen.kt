@@ -129,14 +129,29 @@ fun PlaylistScreen(
                         .clickable { onSongClick(song) }
                         .padding(vertical = 6.dp)
                 ) {
-                    Image(
-                        painter = painterResource(id = song.imageRes),
-                        contentDescription = "Album Art",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                    )
+                    if (song.imageUri != null) {
+                        coil.compose.AsyncImage(
+                            model = song.imageUri,
+                            contentDescription = "Album Art",
+                            contentScale = ContentScale.Crop,
+                            error = painterResource(id = com.hyper.music.R.drawable.app_icon_hyper_music_1786889116311),
+                            fallback = painterResource(id = com.hyper.music.R.drawable.app_icon_hyper_music_1786889116311),
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                        )
+                    } else if (song.imageRes != null) {
+                        Image(
+                            painter = painterResource(id = song.imageRes),
+                            contentDescription = "Album Art",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                        )
+                    } else {
+                        Box(modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant))
+                    }
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(

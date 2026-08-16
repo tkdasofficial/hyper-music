@@ -72,6 +72,71 @@ class MusicViewModel : ViewModel() {
     private val _playbackProgress = MutableStateFlow(0f)
     val playbackProgress: StateFlow<Float> = _playbackProgress.asStateFlow()
 
+    fun loadLocalAudio(context: android.content.Context) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val audioList = mutableListOf<Song>()
+            val collection = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                android.provider.MediaStore.Audio.Media.getContentUri(android.provider.MediaStore.VOLUME_EXTERNAL)
+            } else {
+                android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+            }
+
+            val projection = arrayOf(
+                android.provider.MediaStore.Audio.Media._ID,
+                android.provider.MediaStore.Audio.Media.TITLE,
+                android.provider.MediaStore.Audio.Media.ARTIST,
+                android.provider.MediaStore.Audio.Media.DURATION,
+                android.provider.MediaStore.Audio.Media.DATA,
+                android.provider.MediaStore.Audio.Media.ALBUM_ID
+            )
+            
+            val selection = "${android.provider.MediaStore.Audio.Media.IS_MUSIC} != 0"
+
+            context.contentResolver.query(
+                collection,
+                projection,
+                selection,
+                null,
+                "${android.provider.MediaStore.Audio.Media.TITLE} ASC"
+            )?.use { cursor ->
+                val idColumn = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media._ID)
+                val titleColumn = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.TITLE)
+                val artistColumn = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.ARTIST)
+                val durationColumn = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.DURATION)
+                val dataColumn = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.DATA)
+                val albumIdColumn = cursor.getColumnIndexOrThrow(android.provider.MediaStore.Audio.Media.ALBUM_ID)
+
+                while (cursor.moveToNext()) {
+                    val id = cursor.getLong(idColumn)
+                    val title = cursor.getString(titleColumn) ?: "Unknown Title"
+                    val artist = cursor.getString(artistColumn) ?: "Unknown Artist"
+                    val duration = cursor.getLong(durationColumn)
+                    val data = cursor.getString(dataColumn)
+                    val albumId = cursor.getLong(albumIdColumn)
+
+                    val contentUri = android.content.ContentUris.withAppendedId(collection, id)
+                    val artworkUri = android.net.Uri.parse("content://media/external/audio/albumart/$albumId")
+
+                    audioList.add(
+                        Song(
+                            id = id.toString(),
+                            title = title,
+                            artist = artist,
+                            imageRes = R.drawable.app_icon_hyper_music_1786889116311,
+                            imageUri = artworkUri.toString(),
+                            dataUri = contentUri.toString(),
+                            durationMs = duration
+                        )
+                    )
+                }
+            }
+            _allSongs.value = audioList
+            if (_currentSong.value == null && audioList.isNotEmpty()) {
+                _currentSong.value = audioList.first()
+            }
+        }
+    }
+
     init {
         _currentSong.value = _allSongs.value.firstOrNull()
     }

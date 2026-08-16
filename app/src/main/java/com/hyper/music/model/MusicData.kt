@@ -4,10 +4,12 @@ data class Song(
     val id: String,
     val title: String,
     val artist: String,
-    val imageRes: Int,
+    val imageRes: Int? = null,
+    val imageUri: String? = null,
+    val dataUri: String? = null,
     val playCount: Int = 0,
     val isFavorite: Boolean = false,
-    val durationMs: Long = 210000, // 3:30 default
+    val durationMs: Long = 210000,
     val favoriteTimestamp: Long = 0
 )
 
