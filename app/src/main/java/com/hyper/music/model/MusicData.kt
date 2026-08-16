@@ -7,7 +7,8 @@ data class Song(
     val imageRes: Int,
     val playCount: Int = 0,
     val isFavorite: Boolean = false,
-    val durationMs: Long = 210000 // 3:30 default
+    val durationMs: Long = 210000, // 3:30 default
+    val favoriteTimestamp: Long = 0
 )
 
 data class Playlist(

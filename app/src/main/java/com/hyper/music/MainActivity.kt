@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -76,6 +77,8 @@ class MainActivity : ComponentActivity() {
 fun MainScreen(viewModel: MusicViewModel) {
     var isPlayerExpanded by remember { mutableStateOf(false) }
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
+    var isSearchExpanded by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
     
     val allSongs by viewModel.allSongs.collectAsState()
     val homePlaylists by viewModel.homePlaylists.collectAsState()
@@ -97,39 +100,70 @@ fun MainScreen(viewModel: MusicViewModel) {
             topBar = {
                 TopAppBar(
                     title = {
-                        Text(
-                            text = when (currentScreen) {
-                                is Screen.Home -> "Hyper Music"
-                                is Screen.PlaylistDetail -> currentPlaylist?.title ?: "Playlist"
-                                is Screen.Settings -> "Settings"
-                            },
-                            fontWeight = FontWeight.Bold,
-                            fontSize = if (currentScreen is Screen.Home) 28.sp else 22.sp
-                        )
+                        if (isSearchExpanded) {
+                            TextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                placeholder = { Text("Search songs...", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)) },
+                                singleLine = true,
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent,
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent,
+                                    cursorColor = MaterialTheme.colorScheme.primary,
+                                    focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                                    unfocusedTextColor = MaterialTheme.colorScheme.onBackground
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        } else {
+                            Text(
+                                text = when (currentScreen) {
+                                    is Screen.Home -> "Hyper Music"
+                                    is Screen.PlaylistDetail -> currentPlaylist?.title ?: "Playlist"
+                                    is Screen.Settings -> "Settings"
+                                },
+                                fontWeight = FontWeight.Bold,
+                                fontSize = if (currentScreen is Screen.Home) 28.sp else 22.sp
+                            )
+                        }
                     },
                     navigationIcon = {
-                        if (currentScreen != Screen.Home) {
+                        if (isSearchExpanded) {
+                            IconButton(onClick = { isSearchExpanded = false; searchQuery = "" }) {
+                                Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                            }
+                        } else if (currentScreen != Screen.Home) {
                             IconButton(onClick = { currentScreen = Screen.Home }) {
                                 Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                             }
                         }
                     },
                     actions = {
-                        if (currentScreen is Screen.Home) {
-                            IconButton(onClick = { /* TODO */ }) {
-                                Icon(Icons.Default.Search, contentDescription = "Search")
-                            }
-                            Box {
-                                IconButton(onClick = { showMainMenu = true }) {
-                                    Icon(Icons.Default.MoreVert, contentDescription = "Settings")
+                        if (isSearchExpanded) {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Clear")
                                 }
-                                DropdownMenu(
-                                    expanded = showMainMenu,
-                                    onDismissRequest = { showMainMenu = false }
-                                ) {
-                                    DropdownMenuItem(text = { Text("Settings") }, onClick = { currentScreen = Screen.Settings; showMainMenu = false })
-                                    DropdownMenuItem(text = { Text("Privacy Policy") }, onClick = { showMainMenu = false })
-                                    DropdownMenuItem(text = { Text("Help & Support") }, onClick = { showMainMenu = false })
+                            }
+                        } else {
+                            if (currentScreen is Screen.Home) {
+                                IconButton(onClick = { isSearchExpanded = true }) {
+                                    Icon(Icons.Default.Search, contentDescription = "Search")
+                                }
+                                Box {
+                                    IconButton(onClick = { showMainMenu = true }) {
+                                        Icon(Icons.Default.MoreVert, contentDescription = "Settings")
+                                    }
+                                    DropdownMenu(
+                                        expanded = showMainMenu,
+                                        onDismissRequest = { showMainMenu = false }
+                                    ) {
+                                        DropdownMenuItem(text = { Text("Settings") }, onClick = { currentScreen = Screen.Settings; showMainMenu = false })
+                                        DropdownMenuItem(text = { Text("Privacy Policy") }, onClick = { showMainMenu = false })
+                                        DropdownMenuItem(text = { Text("Help & Support") }, onClick = { showMainMenu = false })
+                                    }
                                 }
                             }
                         }
@@ -158,15 +192,26 @@ fun MainScreen(viewModel: MusicViewModel) {
             Box(modifier = Modifier.padding(innerPadding)) {
                 when (currentScreen) {
                     is Screen.Home -> {
+                        val displayedSongs = if (searchQuery.isNotBlank()) {
+                            allSongs.filter {
+                                it.title.contains(searchQuery, ignoreCase = true) ||
+                                it.artist.contains(searchQuery, ignoreCase = true)
+                            }
+                        } else {
+                            allSongs
+                        }
+                        
                         Column(modifier = Modifier.fillMaxSize()) {
-                            PlaylistsSection(
-                                playlists = homePlaylists,
-                                onCreatePlaylistClick = { showCreatePlaylistDialog = true },
-                                onPlaylistClick = { currentScreen = Screen.PlaylistDetail(it.id) }
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
+                            if (searchQuery.isBlank()) {
+                                PlaylistsSection(
+                                    playlists = homePlaylists,
+                                    onCreatePlaylistClick = { showCreatePlaylistDialog = true },
+                                    onPlaylistClick = { currentScreen = Screen.PlaylistDetail(it.id) }
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                            }
                             SongsListSection(
-                                songs = allSongs,
+                                songs = displayedSongs,
                                 onSongClick = { viewModel.playSong(it) },
                                 onDeleteSong = { viewModel.deleteSong(it.id) },
                                 onEditSongInfo = { /* TODO */ },
@@ -296,7 +341,7 @@ fun PlaylistsSection(playlists: List<Playlist>, onCreatePlaylistClick: () -> Uni
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Your Playlists",
+                text = "Playlists",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
@@ -370,53 +415,68 @@ fun SongsListSection(
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
-        LazyColumn(
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.weight(1f)
-        ) {
-            items(songs) { song ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { onSongClick(song) }
-                        .padding(vertical = 6.dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = song.imageRes),
-                        contentDescription = "Album Art",
-                        contentScale = ContentScale.Crop,
+        if (songs.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No songs available",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
+        } else {
+            LazyColumn(
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                items(songs) { song ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
-                            .size(56.dp)
+                            .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = song.title,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.SemiBold
+                            .clickable { onSongClick(song) }
+                            .padding(vertical = 6.dp)
+                    ) {
+                        Image(
+                            painter = painterResource(id = song.imageRes),
+                            contentDescription = "Album Art",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(RoundedCornerShape(8.dp))
                         )
-                        Text(
-                            text = song.artist,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Box {
-                        IconButton(onClick = { expandedSongId = song.id }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "Options")
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = song.title,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = song.artist,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
-                        SongOptionsDropdown(
-                            expanded = expandedSongId == song.id,
-                            onDismissRequest = { expandedSongId = null },
-                            onEditInfo = { onEditSongInfo(song) },
-                            onDelete = { onDeleteSong(song) },
-                            onShare = { onShareSong(song) },
-                            onSetRingtone = { onSetRingtoneSong(song) }
-                        )
+                        Box {
+                            IconButton(onClick = { expandedSongId = song.id }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = "Options")
+                            }
+                            SongOptionsDropdown(
+                                expanded = expandedSongId == song.id,
+                                onDismissRequest = { expandedSongId = null },
+                                onEditInfo = { onEditSongInfo(song) },
+                                onDelete = { onDeleteSong(song) },
+                                onShare = { onShareSong(song) },
+                                onSetRingtone = { onSetRingtoneSong(song) }
+                            )
+                        }
                     }
                 }
             }

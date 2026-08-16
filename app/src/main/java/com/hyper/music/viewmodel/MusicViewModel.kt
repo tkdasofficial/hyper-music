@@ -7,6 +7,8 @@ import com.hyper.music.model.Playlist
 import com.hyper.music.model.Song
 import com.hyper.music.ui.theme.TextSize
 import com.hyper.music.ui.theme.ThemeMode
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -14,6 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import java.util.UUID
 
 class MusicViewModel : ViewModel() {
@@ -24,27 +27,34 @@ class MusicViewModel : ViewModel() {
     private val _textSize = MutableStateFlow(TextSize.Medium)
     val textSize: StateFlow<TextSize> = _textSize.asStateFlow()
 
-    private val _allSongs = MutableStateFlow(
-        listOf(
-            Song("1", "Neon Horizon", "Cyber Mages", R.drawable.album_art_synthwave_1786889191503, 150, true),
-            Song("2", "Electric Dream", "Cyber Mages", R.drawable.album_art_synthwave_1786889191503, 120, false),
-            Song("3", "Digital Sunset", "Cyber Mages", R.drawable.album_art_synthwave_1786889191503, 40, true),
-            Song("4", "Synth City", "Cyber Mages", R.drawable.album_art_synthwave_1786889191503, 10, false),
-            Song("5", "Outrun The Night", "Cyber Mages", R.drawable.album_art_synthwave_1786889191503, 5, false),
-            Song("6", "Rainy Afternoon", "Lofi Beats", R.drawable.album_art_lofi_1786889206026, 200, true),
-            Song("7", "Coffee Shop Vibe", "Chill Masters", R.drawable.album_art_lofi_1786889206026, 180, true),
-            Song("8", "Study Session", "Lofi Beats", R.drawable.album_art_lofi_1786889206026, 90, false),
-            Song("9", "Retro Rush", "Pixel Warriors", R.drawable.app_icon_hyper_music_1786889116311, 300, true),
-            Song("10", "Future Bass", "Electronic Flow", R.drawable.app_icon_hyper_music_1786889116311, 50, false)
-        )
-    )
+    private val _audioQuality = MutableStateFlow("High")
+    val audioQuality: StateFlow<String> = _audioQuality.asStateFlow()
+
+    private val _gaplessPlayback = MutableStateFlow(true)
+    val gaplessPlayback: StateFlow<Boolean> = _gaplessPlayback.asStateFlow()
+
+    private val _wifiOnly = MutableStateFlow(true)
+    val wifiOnly: StateFlow<Boolean> = _wifiOnly.asStateFlow()
+
+    private val _sleepTimerDuration = MutableStateFlow(0)
+    val sleepTimerDuration: StateFlow<Int> = _sleepTimerDuration.asStateFlow()
+
+    private var sleepTimerJob: Job? = null
+
+    // Removed all mock data for a clean production state
+    private val _allSongs = MutableStateFlow<List<Song>>(emptyList())
     val allSongs: StateFlow<List<Song>> = _allSongs.asStateFlow()
 
     private val _customPlaylists = MutableStateFlow<List<Playlist>>(emptyList())
 
     val homePlaylists: StateFlow<List<Playlist>> = combine(_allSongs, _customPlaylists) { songs, custom ->
-        val mostPlayed = Playlist("auto_most_played", "Most Played", songs.sortedByDescending { it.playCount }, R.drawable.app_icon_hyper_music_1786889116311, true)
-        val favorites = Playlist("auto_fav", "Favorites", songs.filter { it.isFavorite }, R.drawable.album_art_lofi_1786889206026, true)
+        val mostPlayedSongs = songs.filter { it.playCount > 0 }.sortedByDescending { it.playCount }
+        val mostPlayedImage = mostPlayedSongs.firstOrNull()?.imageRes ?: R.drawable.ic_playlist_play
+        val mostPlayed = Playlist("auto_most_played", "Most Played", mostPlayedSongs, mostPlayedImage, true)
+        
+        val favoriteSongs = songs.filter { it.isFavorite }.sortedByDescending { it.favoriteTimestamp }
+        val favoriteImage = favoriteSongs.firstOrNull()?.imageRes ?: R.drawable.ic_playlist_love
+        val favorites = Playlist("auto_fav", "Favorites", favoriteSongs, favoriteImage, true)
         
         val artistAutoPlaylists = songs.groupBy { it.artist }
             .filter { it.value.size >= 5 }
@@ -63,11 +73,26 @@ class MusicViewModel : ViewModel() {
     val playbackProgress: StateFlow<Float> = _playbackProgress.asStateFlow()
 
     init {
-        _currentSong.value = _allSongs.value.first()
+        _currentSong.value = _allSongs.value.firstOrNull()
     }
 
     fun setThemeMode(mode: ThemeMode) { _themeMode.value = mode }
     fun setTextSize(size: TextSize) { _textSize.value = size }
+    fun setAudioQuality(quality: String) { _audioQuality.value = quality }
+    fun toggleGapless() { _gaplessPlayback.value = !_gaplessPlayback.value }
+    fun toggleWifiOnly() { _wifiOnly.value = !_wifiOnly.value }
+    
+    fun setSleepTimer(minutes: Int) {
+        _sleepTimerDuration.value = minutes
+        sleepTimerJob?.cancel()
+        if (minutes > 0) {
+            sleepTimerJob = viewModelScope.launch {
+                delay(minutes * 60 * 1000L)
+                _isPlaying.value = false
+                _sleepTimerDuration.value = 0
+            }
+        }
+    }
 
     fun togglePlayPause() {
         _isPlaying.value = !_isPlaying.value
@@ -85,7 +110,7 @@ class MusicViewModel : ViewModel() {
 
     fun toggleFavorite(songId: String) {
         _allSongs.update { songs ->
-            songs.map { if (it.id == songId) it.copy(isFavorite = !it.isFavorite) else it }
+            songs.map { if (it.id == songId) it.copy(isFavorite = !it.isFavorite, favoriteTimestamp = System.currentTimeMillis()) else it }
         }
     }
 
