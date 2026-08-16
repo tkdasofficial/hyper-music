@@ -1,0 +1,6 @@
+{
+  "name": "Hyper Music",
+  "description": "A minimal, premium music player app with a unique circular progress player.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
