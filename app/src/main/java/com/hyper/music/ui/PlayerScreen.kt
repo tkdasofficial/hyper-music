@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -34,12 +35,14 @@ fun PlayerScreen(
     song: Song,
     isPlaying: Boolean,
     isLooping: Boolean,
+    isShuffling: Boolean,
     progress: Float,
     onProgressChange: (Float) -> Unit,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
     onLoopToggle: () -> Unit,
+    onShuffleToggle: () -> Unit,
     onFavoriteToggle: () -> Unit,
     onClose: () -> Unit,
     onDelete: () -> Unit,
@@ -222,8 +225,16 @@ fun PlayerScreen(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { /* Shuffle */ }) {
-                    Icon(Icons.Default.Shuffle, contentDescription = "Shuffle")
+                val shuffleScale by animateFloatAsState(targetValue = if (isShuffling) 1.2f else 1f)
+                IconButton(
+                    onClick = onShuffleToggle,
+                    modifier = Modifier.scale(shuffleScale)
+                ) {
+                    Icon(
+                        Icons.Default.Shuffle,
+                        contentDescription = "Shuffle",
+                        tint = if (isShuffling) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
+                    )
                 }
                 IconButton(
                     onClick = onPrevious,
@@ -249,7 +260,11 @@ fun PlayerScreen(
                 ) {
                     Icon(Icons.Default.SkipNext, contentDescription = "Next", modifier = Modifier.size(40.dp))
                 }
-                IconButton(onClick = onLoopToggle) {
+                val loopScale by animateFloatAsState(targetValue = if (isLooping) 1.2f else 1f)
+                IconButton(
+                    onClick = onLoopToggle,
+                    modifier = Modifier.scale(loopScale)
+                ) {
                     Icon(
                         Icons.Default.Repeat, 
                         contentDescription = "Repeat",

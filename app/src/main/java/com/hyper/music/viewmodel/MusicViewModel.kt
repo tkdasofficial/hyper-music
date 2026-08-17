@@ -31,6 +31,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _isLooping = MutableStateFlow(false)
     val isLooping: StateFlow<Boolean> = _isLooping.asStateFlow()
 
+    private val _isShuffling = MutableStateFlow(false)
+    val isShuffling: StateFlow<Boolean> = _isShuffling.asStateFlow()
+
     private val _themeMode = MutableStateFlow(ThemeMode.System)
     val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
 
@@ -240,6 +243,15 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun updateSongDetails(songId: String, newTitle: String, newArtist: String) {
+        _allSongs.update { songs ->
+            songs.map { if (it.id == songId) it.copy(title = newTitle, artist = newArtist) else it }
+        }
+        if (_currentSong.value?.id == songId) {
+            _currentSong.value = _allSongs.value.find { it.id == songId }
+        }
+    }
+
     fun createPlaylist(name: String) {
         if (name.isBlank()) return
         val newPlaylist = Playlist(
@@ -257,24 +269,38 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     
+    fun toggleShuffle() {
+        _isShuffling.value = !_isShuffling.value
+    }
+
     fun skipNext() {
         val songs = _allSongs.value
+        if (songs.isEmpty()) return
+        if (_isShuffling.value) {
+            playSong(songs.random())
+            return
+        }
         val current = _currentSong.value ?: return
         val currentIndex = songs.indexOfFirst { it.id == current.id }
         if (currentIndex != -1 && currentIndex < songs.size - 1) {
             playSong(songs[currentIndex + 1])
-        } else if (songs.isNotEmpty()) {
+        } else {
             playSong(songs.first())
         }
     }
     
     fun skipPrevious() {
         val songs = _allSongs.value
+        if (songs.isEmpty()) return
+        if (_isShuffling.value) {
+            playSong(songs.random())
+            return
+        }
         val current = _currentSong.value ?: return
         val currentIndex = songs.indexOfFirst { it.id == current.id }
         if (currentIndex > 0) {
             playSong(songs[currentIndex - 1])
-        } else if (songs.isNotEmpty()) {
+        } else {
             playSong(songs.last())
         }
     }

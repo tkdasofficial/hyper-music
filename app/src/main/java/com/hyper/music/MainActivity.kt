@@ -43,6 +43,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
@@ -119,21 +122,26 @@ fun MainScreen(viewModel: MusicViewModel) {
     val currentSong by viewModel.currentSong.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
     val isLooping by viewModel.isLooping.collectAsState()
+    val isShuffling by viewModel.isShuffling.collectAsState()
     val playbackProgress by viewModel.playbackProgress.collectAsState()
 
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
     var editPlaylistInfo by remember { mutableStateOf<Playlist?>(null) }
+    var showEditSongDialog by remember { mutableStateOf<Song?>(null) }
     var showMainMenu by remember { mutableStateOf(false) }
 
     val currentPlaylist = (currentScreen as? Screen.PlaylistDetail)?.let { detail ->
         homePlaylists.find { it.id == detail.playlistId }
     }
 
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
             topBar = {
                 TopAppBar(
+                    scrollBehavior = scrollBehavior,
                     title = {
                         if (isSearchExpanded) {
                             TextField(
@@ -287,16 +295,18 @@ fun MainScreen(viewModel: MusicViewModel) {
                     song = currentSong!!,
                     isPlaying = isPlaying,
                     isLooping = isLooping,
+                    isShuffling = isShuffling,
                     progress = playbackProgress,
                     onProgressChange = { viewModel.updateProgress(it) },
                     onPlayPause = { viewModel.togglePlayPause() },
                     onNext = { viewModel.skipNext() },
                     onPrevious = { viewModel.skipPrevious() },
                     onLoopToggle = { viewModel.toggleLoop() },
+                    onShuffleToggle = { viewModel.toggleShuffle() },
                     onFavoriteToggle = { viewModel.toggleFavorite(currentSong!!.id) },
                     onClose = { isPlayerExpanded = false },
                     onDelete = { viewModel.deleteSong(currentSong!!.id) },
-                    onEditInfo = { /* TODO */ },
+                    onEditInfo = { showEditSongDialog = currentSong },
                     onShare = { /* TODO */ },
                     onSetRingtone = { /* TODO */ }
                 )
@@ -334,6 +344,42 @@ fun MainScreen(viewModel: MusicViewModel) {
                 },
                 dismissButton = {
                     TextButton(onClick = { editPlaylistInfo = null }) { Text("Cancel") }
+                }
+            )
+        }
+
+        if (showEditSongDialog != null) {
+            var newTitle by remember { mutableStateOf(showEditSongDialog!!.title) }
+            var newArtist by remember { mutableStateOf(showEditSongDialog!!.artist) }
+            AlertDialog(
+                onDismissRequest = { showEditSongDialog = null },
+                title = { Text("Edit Song Info") },
+                text = {
+                    Column {
+                        OutlinedTextField(
+                            value = newTitle,
+                            onValueChange = { newTitle = it },
+                            label = { Text("Title") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                        )
+                        OutlinedTextField(
+                            value = newArtist,
+                            onValueChange = { newArtist = it },
+                            label = { Text("Artist") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        viewModel.updateSongDetails(showEditSongDialog!!.id, newTitle, newArtist)
+                        showEditSongDialog = null
+                    }) { Text("Save") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showEditSongDialog = null }) { Text("Cancel") }
                 }
             )
         }
@@ -546,11 +592,26 @@ fun BottomPlayer(
     onPrevious: () -> Unit,
     onClick: () -> Unit
 ) {
+    var swipeOffset by remember { mutableStateOf(0f) }
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = 16.dp, end = 16.dp, bottom = 24.dp)
             .windowInsetsPadding(WindowInsets.navigationBars)
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        if (swipeOffset > 100) onPrevious()
+                        else if (swipeOffset < -100) onNext()
+                        swipeOffset = 0f
+                    },
+                    onHorizontalDrag = { change, dragAmount ->
+                        change.consume()
+                        swipeOffset += dragAmount
+                    }
+                )
+            }
             .clickable { onClick() }, 
         shape = RoundedCornerShape(36.dp),
         color = MaterialTheme.colorScheme.surfaceVariant,
